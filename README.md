@@ -1,2 +1,19 @@
-# Intelligent-Regression-Testing-Agent
-Replace manual regression testing performed in SoapUI and GUI applications with AI-assisted automated regression. Instead of simply generating test scripts, the agent continuously understands application changes, creates tests, executes them, analyzes failures, and keeps the automation updated.
+# Intelligent Regression Testing Agent
+
+## Structure
+
+- project/Intelligent-Regression-Testing-Agent.xml
+- pom.xml
+- .github/workflows/soapui-tests.yml
+
+## Run Locally
+
+```bash
+mvn test
+```
+
+## Notes
+
+- Endpoint and WSDL references should be parameterized for multi-environment execution.
+- The project contains a CaseFile SOAP service test flow.
+- priorityFlag is expected as a boolean value.
