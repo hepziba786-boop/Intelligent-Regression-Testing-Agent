@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions name="CaseFileService"
+    targetNamespace="http://demo.org/casefile"
+    xmlns:tns="http://demo.org/casefile"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://demo.org/casefile">
+
+      <xsd:element name="createCaseFileRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="caseId" type="xsd:string"/>
+            <xsd:element name="applicantName" type="xsd:string"/>
+            <xsd:element name="caseType" type="xsd:string"/>
+            <!-- v3 change: priorityFlag is now REQUIRED (minOccurs defaults to 1) -->
+            <xsd:element name="priorityFlag" type="xsd:boolean"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="createCaseFileResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="caseFileId" type="xsd:string"/>
+            <xsd:element name="applicantName" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="caseType" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="priorityFlag" type="xsd:boolean" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:element name="createCaseFileFault">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="faultcode" type="xsd:string"/>
+            <xsd:element name="faultstring" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+    </xsd:schema>
+  </wsdl:types>
+
+  <wsdl:message name="createCaseFileInput">
+    <wsdl:part name="parameters" element="tns:createCaseFileRequest"/>
+  </wsdl:message>
+  <wsdl:message name="createCaseFileOutput">
+    <wsdl:part name="parameters" element="tns:createCaseFileResponse"/>
+  </wsdl:message>
+  <wsdl:message name="createCaseFileFaultMessage">
+    <wsdl:part name="parameters" element="tns:createCaseFileFault"/>
+  </wsdl:message>
+
+  <wsdl:portType name="CaseFilePortType">
+    <wsdl:operation name="createCaseFile">
+      <wsdl:input message="tns:createCaseFileInput"/>
+      <wsdl:output message="tns:createCaseFileOutput"/>
+      <wsdl:fault name="CaseFileFault" message="tns:createCaseFileFaultMessage"/>
+    </wsdl:operation>
+  </wsdl:portType>
+
+  <wsdl:binding name="CaseFileBinding" type="tns:CaseFilePortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <wsdl:operation name="createCaseFile">
+      <soap:operation soapAction="http://demo.org/casefile/createCaseFile"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="CaseFileFault">
+        <soap:fault name="CaseFileFault" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:binding>
+
+  <wsdl:service name="CaseFileService">
+    <wsdl:port name="CaseFilePort" binding="tns:CaseFileBinding">
+      <soap:address location="http://localhost:8088/mock/CaseFileService"/>
+    </wsdl:port>
+  </wsdl:service>
+
+</wsdl:definitions>
