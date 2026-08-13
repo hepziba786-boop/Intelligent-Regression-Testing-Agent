@@ -1,0 +1,29 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< org.demo:soapui-regression-agent >------------------
+[INFO] Building soapui-regression-agent 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ soapui-regression-agent ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /workspaces/Intelligent-Regression-Testing-Agent/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ soapui-regression-agent ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ soapui-regression-agent ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory /workspaces/Intelligent-Regression-Testing-Agent/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ soapui-regression-agent ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ soapui-regression-agent ---
+[INFO] No tests to run.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.365 s
+[INFO] Finished at: 2026-08-13T04:54:37Z
+[INFO] ------------------------------------------------------------------------

@@ -1,0 +1,32 @@
+{
+  "agent": {
+    "name": "SOAP Self-Healing Test Agent",
+    "version": "1.0.0",
+    "description": "Intelligent agent that auto-fixes SOAP test failures by analyzing WSDL schema"
+  },
+  "execution": {
+    "max_iterations": 5,
+    "retry_delay": 2,
+    "timeout": 60
+  },
+  "wsdl": {
+    "auto_reload": true,
+    "parse_complex_types": true
+  },
+  "test_execution": {
+    "framework": "maven",
+    "command": "mvn test",
+    "output_parser": "advanced"
+  },
+  "request_fixing": {
+    "auto_fix_missing_required_fields": true,
+    "generate_sample_values": true,
+    "preserve_existing_values": true,
+    "max_field_length": 1000
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "agent-execution.log",
+    "format": "[%(timestamp)s] %(level)s: %(message)s"
+  }
+}

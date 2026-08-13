@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  soap-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: soap-self-healing-agent
+    volumes:
+      - .:/app
+      - /app/.git  # Persist git directory
+    environment:
+      - MAVEN_OPTS=-Xmx1024m
+      - JAVA_TOOL_OPTIONS=-Xmx1024m
+    working_dir: /app
+    command: ./run-agent.sh
+    ports:
+      - "8088:8088"  # Mock service port
+    networks:
+      - soap-network
+
+  # Optional: Mock SOAP service for local testing
+  mock-service:
+    image: alpine:latest
+    container_name: soap-mock-service
+    volumes:
+      - .:/app:ro
+    working_dir: /app
+    command: echo "Mock service ready at 0.0.0.0:8088"
+    ports:
+      - "8088:8088"
+    networks:
+      - soap-network
+    profiles:
+      - "optional"
+
+networks:
+  soap-network:
+    driver: bridge
