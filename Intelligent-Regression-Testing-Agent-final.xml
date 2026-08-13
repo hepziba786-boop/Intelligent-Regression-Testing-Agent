@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project id="e74c382a-f2d0-4fc5-975a-f09cfc50e3bd" activeEnvironment="Default" name="Intelligent Regression Testing Agent" resourceRoot="" soapui-version="5.10.0" abortOnError="false" runType="SEQUENTIAL" xmlns:con="http://eviware.com/soapui/config"><con:settings/><con:interface xsi:type="con:WsdlInterface" id="0fe6dc68-3bf4-4c0e-962b-d169f32bcded" wsaVersion="NONE" name="CaseFileBinding" type="wsdl" bindingName="{http://demo.org/casefile}CaseFileBinding" soapVersion="1_1" anonymous="optional" definition="${#Project#wsdlPath}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><con:settings/><con:definitionCache type="TEXT" rootPart="${#Project#wsdlPath}"><con:part><con:url>${#Project#wsdlPath}</con:url><con:content><![CDATA[<wsdl:definitions name="CaseFileService" targetNamespace="http://demo.org/casefile" xmlns:tns="http://demo.org/casefile" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/">
+  <wsdl:types>
+    <xsd:schema targetNamespace="http://demo.org/casefile">
+      <xsd:element name="createCaseFileRequest">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="caseId" type="xsd:string"/>
+            <xsd:element name="applicantName" type="xsd:string"/>
+            <xsd:element name="caseType" type="xsd:string"/>
+            <!--v3 change: priorityFlag is now REQUIRED (minOccurs defaults to 1)-->
+            <xsd:element name="priorityFlag" type="xsd:boolean"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="createCaseFileResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="status" type="xsd:string"/>
+            <xsd:element name="caseFileId" type="xsd:string"/>
+            <xsd:element name="applicantName" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="caseType" type="xsd:string" minOccurs="0"/>
+            <xsd:element name="priorityFlag" type="xsd:boolean" minOccurs="0"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="createCaseFileFault">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="faultcode" type="xsd:string"/>
+            <xsd:element name="faultstring" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </wsdl:types>
+  <wsdl:message name="createCaseFileInput">
+    <wsdl:part name="parameters" element="tns:createCaseFileRequest"/>
+  </wsdl:message>
+  <wsdl:message name="createCaseFileOutput">
+    <wsdl:part name="parameters" element="tns:createCaseFileResponse"/>
+  </wsdl:message>
+  <wsdl:message name="createCaseFileFaultMessage">
+    <wsdl:part name="parameters" element="tns:createCaseFileFault"/>
+  </wsdl:message>
+  <wsdl:portType name="CaseFilePortType">
+    <wsdl:operation name="createCaseFile">
+      <wsdl:input message="tns:createCaseFileInput"/>
+      <wsdl:output message="tns:createCaseFileOutput"/>
+      <wsdl:fault name="CaseFileFault" message="tns:createCaseFileFaultMessage"/>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="CaseFileBinding" type="tns:CaseFilePortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <wsdl:operation name="createCaseFile">
+      <soap:operation soapAction="http://demo.org/casefile/createCaseFile"/>
+      <wsdl:input>
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output>
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="CaseFileFault">
+        <soap:fault name="CaseFileFault" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="CaseFileService">
+    <wsdl:port name="CaseFilePort" binding="tns:CaseFileBinding">
+      <soap:address location="${#Project#endpoint}"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>]]></con:content><con:type>http://schemas.xmlsoap.org/wsdl/</con:type></con:part></con:definitionCache><con:endpoints><con:endpoint>${#Project#endpoint}</con:endpoint><con:endpoint>${#Project#endpoint}</con:endpoint></con:endpoints><con:operation id="b84a4234-3cae-40c0-92cc-260f5ae2ddf3" isOneWay="false" action="http://demo.org/casefile/createCaseFile" name="createCaseFile" bindingOperationName="createCaseFile" type="Request-Response" inputName="" receivesAttachments="false" sendsAttachments="false" anonymous="optional"><con:settings/><con:call id="28f43057-a5f1-4922-b1f3-ede97a312f9f" name="Request 1"><con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cas="http://demo.org/casefile">\r
+   <soapenv:Header/>\r
+   <soapenv:Body>\r
+      <cas:createCaseFileRequest>\r
+         <caseId>?</caseId>\r
+         <applicantName>?</applicantName>\r
+         <caseType>?</caseType>\r
+         <!--Optional:-->\r
+         <priorityFlag>?</priorityFlag>\r
+      </cas:createCaseFileRequest>\r
+   </soapenv:Body>\r
+</soapenv:Envelope>]]></con:request><con:credentials><con:authType>No Authorization</con:authType></con:credentials><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/><con:wsrmConfig version="1.2"/></con:call><con:call id="46e56da2-e9cf-462d-8152-a836cd64f2b5" name="Request 1"><con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cas="http://demo.org/casefile">\r
+   <soapenv:Header/>\r
+   <soapenv:Body>\r
+      <cas:createCaseFileRequest>\r
+         <caseId>?</caseId>\r
+         <applicantName>?</applicantName>\r
+         <caseType>?</caseType>\r
+
+      </cas:createCaseFileRequest>\r
+   </soapenv:Body>\r
+</soapenv:Envelope>]]></con:request><con:credentials><con:authType>No Authorization</con:authType></con:credentials><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/><con:wsrmConfig version="1.2"/></con:call><con:call id="7b9a8927-782e-4826-8e02-570f75d43513" name="Request 3"><con:settings/><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request/><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/></con:call><con:call id="d62ee365-8203-4cd4-a7c0-091e539f845e" name="Request 4"><con:settings/><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request/><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/></con:call><con:call id="ca5266d9-d9bb-4889-8efd-2009c196fa69" name="Request 5"><con:settings/><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request/><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/></con:call></con:operation></con:interface><con:testSuite id="ce50e0c3-bcd2-4814-9c92-0ecf04616362" name="TestSuite 1"><con:settings/><con:runType>SEQUENTIAL</con:runType><con:testCase id="1679d3bc-d88a-46f7-8246-8f353adb0a2c" failOnError="true" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="TestCase 1" searchProperties="true"><con:settings/><con:testStep type="request" id="5a4f7145-4750-47b4-a3fd-dbab1019401b" name="createCaseFile"><con:settings/><con:config xsi:type="con:RequestStep" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><con:interface>CaseFileBinding</con:interface><con:operation>createCaseFile</con:operation><con:request name="createCaseFile" outgoingWss="" incomingWss="" timeout="" sslKeystore="" useWsAddressing="false" useWsReliableMessaging="false" wssPasswordType="" id="70a5d170-f560-44a2-8f93-b42d799067eb"><con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings><con:encoding>UTF-8</con:encoding><con:endpoint>${#Project#endpoint}</con:endpoint><con:request><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cas="http://demo.org/casefile">\r
+   <soapenv:Header/>\r
+   <soapenv:Body>\r
+      <cas:createCaseFileRequest>\r
+         <caseId>${#TestSuite#caseId}</caseId>\r
+         <applicantName>SOAP</applicantName>\r
+         <caseType>Test Type</caseType>\r
+         <!--Optional:-->\r
+<!--       <priorityFlag>true</priorityFlag>\r-->
+      </cas:createCaseFileRequest>\r
+   </soapenv:Body>\r
+</soapenv:Envelope>]]></con:request><con:assertion type="SOAP Response" id="7fd47de1-9089-4c39-9cd0-190748e90939" name="SOAP Response"/><con:assertion type="Simple Contains" id="d63f84e8-fe6f-40bc-a50b-1e4f1e48db6a" name="&lt;applicantName>"><con:configuration><token>&lt;applicantName>SOAP&lt;/applicantName>
+</token><ignoreCase>false</ignoreCase><useRegEx>false</useRegEx></con:configuration></con:assertion><con:assertion type="Simple Contains" id="cf4137b1-9bbb-4537-bcb3-0b24b191b46f" name="&lt;caseType>"><con:configuration><token>&lt;caseType>Test Type&lt;/caseType>
+</token><ignoreCase>false</ignoreCase><useRegEx>false</useRegEx></con:configuration></con:assertion><con:assertion type="Simple Contains" id="793c1da9-cb54-4b86-946d-64804e799f38" name="&lt;priorityFlag>"><con:configuration><token>&lt;priorityFlag>true&lt;/priorityFlag>
+</token><ignoreCase>false</ignoreCase><useRegEx>false</useRegEx></con:configuration></con:assertion><con:assertion type="Simple Contains" id="c77e02fc-369a-4c16-b9da-482b7977ba85" name="status"><con:configuration><token>&lt;status>SUCCESS&lt;/status>
+</token><ignoreCase>false</ignoreCase><useRegEx>false</useRegEx></con:configuration></con:assertion><con:credentials><con:authType>No Authorization</con:authType></con:credentials><con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/><con:wsrmConfig version="1.2"/></con:request></con:config></con:testStep><con:properties/></con:testCase><con:properties><con:property><con:name>caseId</con:name><con:value>${=GregorianCalendar.getInstance().getTimeInMillis()}</con:value></con:property><con:property><con:name>applicantName</con:name><con:value>SOAP</con:value></con:property></con:properties></con:testSuite><con:mockService id="54950fbb-ccf1-408f-a57c-3597a140d872" port="8088" path="/mockCaseFileBinding" host="${#Project#mockHost}" name="CaseFileBinding MockService"><con:settings><con:setting id="com.eviware.soapui.impl.wsdl.mock.WsdlMockService@require-soap-action">false</con:setting></con:settings><con:properties/><con:mockOperation name="createCaseFile" id="45a2cc7c-36e5-4863-8c28-28b3fe99ae5a" interface="CaseFileBinding" operation="createCaseFile"><con:settings/><con:defaultResponse>Response 1</con:defaultResponse><con:dispatchStyle>SCRIPT</con:dispatchStyle><con:dispatchPath> import com.eviware.soapui.support.XmlHolder; def holder = new XmlHolder(mockRequest.requestContent); def caseId = holder.getNodeValue("//*[local-name()='caseId']"); def applicantName = holder.getNodeValue("//*[local-name()='applicantName']"); def caseType = holder.getNodeValue("//*[local-name()='caseType']"); def priorityFlag = holder.getNodeValue("//*[local-name()='priorityFlag']"); if (!caseId?.trim() || !applicantName?.trim() || !caseType?.trim() || !priorityFlag?.trim()) { return "FaultResponse"; } else { return "SuccessResponse"; }</con:dispatchPath><con:response name="Response 1" id="bf7b08ff-7183-41c8-af46-895fc076777d" httpResponseStatus="200" encoding="UTF-8"><con:settings/><con:script><![CDATA[import com.eviware.soapui.support.XmlHolder; def holder = new XmlHolder(mockRequest.requestContent); def caseId = holder.getNodeValue("//*[local-name()='caseId']"); def applicantName = holder.getNodeValue("//*[local-name()='applicantName']"); def caseType = holder.getNodeValue("//*[local-name()='caseType']"); def priorityFlag = holder.getNodeValue("//*[local-name()='priorityFlag']"); mockResponse.responseContent = mockResponse.responseContent .replaceAll(/<caseFileId>.*?<\/caseFileId>|<caseFileId\s*\/>/, "<caseFileId>CF-${caseId}</caseFileId>") .replaceAll(/<status>.*?<\/status>|<status\s*\/>/, "<status>SUCCESS</status>") .replaceAll(/<applicantName>.*?<\/applicantName>|<applicantName\s*\/>/, "<applicantName>${applicantName}</applicantName>") .replaceAll(/<caseType>.*?<\/caseType>|<caseType\s*\/>/, "<caseType>${caseType}</caseType>") .replaceAll(/<priorityFlag>.*?<\/priorityFlag>|<priorityFlag\s*\/>/, "<priorityFlag>${priorityFlag}</priorityFlag>");]]></con:script><con:responseContent><![CDATA[<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cas="http://demo.org/casefile">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <cas:createCaseFileResponse>
+         <status>SUCCESS</status>
+         <applicantName>SOAP</applicantName>
+         <caseFileId>CF-1786596049212</caseFileId>
+         <caseType>Test Type</caseType>
+         <priorityFlag>null</priorityFlag>
+      </cas:createCaseFileResponse>
+   </soapenv:Body>
+</soapenv:Envelope>]]></con:responseContent><con:wsaConfig mustUnderstand="NONE" version="200508" action="http://demo.org/casefile/createCaseFile"/></con:response><con:dispatchConfig/></con:mockOperation></con:mockService><con:properties><con:property><con:name>endpoint</con:name><con:value>http://localhost:8088/mockCaseFileBinding</con:value></con:property></con:properties><con:wssContainer/><con:oAuth2ProfileContainer/><con:oAuth1ProfileContainer/><con:sensitiveInformation/></con:soapui-project>
