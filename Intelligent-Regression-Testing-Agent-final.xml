@@ -97,9 +97,6 @@
       <cas:createCaseFileRequest>\r
          <caseId>${#TestSuite#caseId}</caseId>\r
          <applicantName>SOAP</applicantName>\r
-         <caseType>Test Type</caseType>\r
-         <!--Optional:-->\r
-<!--       <priorityFlag>true</priorityFlag>\r-->
       </cas:createCaseFileRequest>\r
    </soapenv:Body>\r
 </soapenv:Envelope>]]></con:request><con:assertion type="SOAP Response" id="7fd47de1-9089-4c39-9cd0-190748e90939" name="SOAP Response"/><con:assertion type="Simple Contains" id="d63f84e8-fe6f-40bc-a50b-1e4f1e48db6a" name="&lt;applicantName>"><con:configuration><token>&lt;applicantName>SOAP&lt;/applicantName>
