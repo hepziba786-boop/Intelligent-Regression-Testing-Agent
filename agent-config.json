@@ -24,6 +24,14 @@
     "preserve_existing_values": true,
     "max_field_length": 1000
   },
+  "healing_scope": {
+    "allow_project_xml_updates": true,
+    "allow_endpoint_updates": true,
+    "allow_business_code_changes": false
+  },
+  "mock_service": {
+    "auto_start_local_mock": true
+  },
   "logging": {
     "level": "INFO",
     "file": "agent-execution.log",

@@ -164,6 +164,21 @@ docker run -v $(pwd):/app soap-agent ./run-agent.sh
     ./run-agent.sh
 ```
 
+The repository now includes an automated workflow at `/home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent/.github/workflows/soapui-tests.yml` that:
+- triggers on WSDL, SoapUI project, and agent changes
+- runs the self-healing agent through `./run-agent.sh`
+- publishes `agent-execution.log` and the healed SoapUI project as artifacts
+- persists healed SoapUI assets back to the branch on push events
+
+### Healing Scope
+
+The agent is restricted to SOAP test assets only:
+- SoapUI project XML updates
+- request payload healing
+- endpoint synchronization from the WSDL
+
+It does not rewrite business/service implementation code.
+
 ### Jenkins
 
 ```groovy

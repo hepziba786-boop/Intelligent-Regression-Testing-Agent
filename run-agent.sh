@@ -16,6 +16,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_SCRIPT="${SCRIPT_DIR}/soap-self-healing-agent.py"
 AGENT_CONFIG="${SCRIPT_DIR}/agent-config.json"
+LOG_FILE="${AGENT_LOG_FILE:-${SCRIPT_DIR}/agent-execution.log}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -31,6 +32,10 @@ echo -e "${BLUE}║                                                             
 echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
+mkdir -p "$(dirname "$LOG_FILE")"
+touch "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
 # Check prerequisites
 echo -e "${YELLOW}[*] Checking prerequisites...${NC}"
 
@@ -41,10 +46,10 @@ fi
 echo -e "${GREEN}[✓] Python 3 found${NC}"
 
 if ! command -v mvn &> /dev/null; then
-    echo -e "${RED}[!] Maven is not installed${NC}"
-    exit 1
+    echo -e "${YELLOW}[!] Maven is not installed; continuing because tests run through the Python agent${NC}"
+else
+    echo -e "${GREEN}[✓] Maven found${NC}"
 fi
-echo -e "${GREEN}[✓] Maven found${NC}"
 
 if [ ! -f "$AGENT_SCRIPT" ]; then
     echo -e "${RED}[!] Agent script not found: $AGENT_SCRIPT${NC}"
