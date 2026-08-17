@@ -19,11 +19,14 @@ import sys
 import os
 import re
 import time
+import threading
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse
 
 
 class ElementType(Enum):
@@ -81,6 +84,15 @@ class WSDLAnalyzer:
         if service is not None:
             return service.get('name', 'Unknown')
         return 'Unknown'
+
+    def get_service_endpoint(self) -> Optional[str]:
+        """Get SOAP service endpoint from WSDL"""
+        address = self.root.find('.//soap:address', self.namespaces)
+        if address is not None:
+            location = address.get('location')
+            if location:
+                return location.strip()
+        return None
 
     def _parse_operations(self) -> Dict[str, ET.Element]:
         """Parse operations defined in the WSDL (portType operations).
@@ -274,6 +286,7 @@ class SoapTestAnalyzer:
             'con': 'http://eviware.com/soapui/config',
             'xsi': 'http://www.w3.org/2001/XMLSchema-instance'
         }
+        self.allowed_update_paths = {str(Path(soapui_project_path).resolve())}
     
     def run_tests(self, test_suite_name: Optional[str] = None) -> Dict:
         """Run SOAP tests directly by sending HTTP requests"""
@@ -382,7 +395,17 @@ class SoapTestAnalyzer:
                                             case_passed = False
                                             passed = False
                                 elif 'Script' in assert_type or 'Contains' in assert_type:
-                                    stdout_lines.append(f"      [Assert] {assert_type}: OK")
+                                    token_elem = assertion.find(".//token")
+                                    token = token_elem.text if token_elem is not None else None
+                                    if token and token not in resp_text:
+                                        stdout_lines.append(f"      [Assert] {assert_type}: FAIL")
+                                        failures_found.append(
+                                            f"Assertion failed in {case_name}: missing token {token}"
+                                        )
+                                        case_passed = False
+                                        passed = False
+                                    else:
+                                        stdout_lines.append(f"      [Assert] {assert_type}: PASS")
                     
                     except urllib.error.HTTPError as e:
                         resp_text = e.read().decode('utf-8') if e.code >= 400 else ''
@@ -397,9 +420,12 @@ class SoapTestAnalyzer:
                             stdout_lines.append(f"      Response: {resp_text[:100]}")
                     
                     except urllib.error.URLError as e:
-                        # Endpoint not reachable - this is expected for mock service
-                        stdout_lines.append(f"    [Step] {step_name}: Connection Error (endpoint not available)")
-                        # Don't fail for connection errors - the request validation was ok
+                        stdout_lines.append(
+                            f"    [Step] {step_name}: Connection Error - {str(e.reason)[:80]}"
+                        )
+                        failures_found.append(f"Connection error in {case_name}: {e.reason}")
+                        case_passed = False
+                        passed = False
                     
                     except Exception as e:
                         stdout_lines.append(f"    [Step] {step_name}: ERROR - {str(e)[:50]}")
@@ -489,17 +515,32 @@ class SoapTestAnalyzer:
     def get_test_requests(self) -> Dict[str, str]:
         """Extract SOAP request templates from project"""
         requests = {}
-        
+
+        for step in self.root.findall('.//con:testStep', self.namespaces):
+            step_name = step.get('name', 'Unknown')
+            request_elem = step.find('.//con:request', self.namespaces)
+
+            if request_elem is not None and request_elem.text and request_elem.text.strip():
+                requests[step_name] = request_elem.text.strip()
+
+        if requests:
+            return requests
+
         for call in self.root.findall('.//con:call', self.namespaces):
             call_name = call.get('name', 'Unknown')
             request_elem = call.find('con:request', self.namespaces)
-            
-            if request_elem is not None and request_elem.text:
+
+            if request_elem is not None and request_elem.text and request_elem.text.strip():
                 requests[call_name] = request_elem.text.strip()
         
         return requests
     
-    def update_request_in_project(self, call_name: str, new_request: str) -> bool:
+    def update_request_in_project(
+        self,
+        call_name: str,
+        new_request: str,
+        original_request: Optional[str] = None
+    ) -> bool:
         """Update a SOAP request in the project file - both in calls and test cases"""
         updated = False
         
@@ -511,19 +552,53 @@ class SoapTestAnalyzer:
                     request_elem.text = '\n' + new_request + '\n'
                     updated = True
         
-        # Update in test case steps - look for requests in test steps
+        # Update in test case steps
         for step in self.root.findall('.//con:testStep', self.namespaces):
-            # Check if this step contains a request
             request_elem = step.find('.//con:request', self.namespaces)
-            if request_elem is not None and not request_elem.text:
-                # If the request is empty, fill it
-                request_elem.text = '\n' + new_request + '\n'
+            if request_elem is None:
+                continue
+
+            matches_step_name = step.get('name') == call_name
+            matches_original_request = (
+                original_request
+                and request_elem.text
+                and request_elem.text.strip() == original_request.strip()
+            )
+
+            if matches_step_name or matches_original_request:
                 updated = True
+                request_elem.text = '\n' + new_request + '\n'
         
+        return updated
+
+    def update_endpoint_in_project(self, new_endpoint: str) -> bool:
+        """Update the SOAP endpoint in supported project fields only"""
+        updated = False
+
+        properties = self.root.findall(".//con:property", self.namespaces)
+        for prop in properties:
+            name_elem = prop.find("con:name", self.namespaces)
+            value_elem = prop.find("con:value", self.namespaces)
+            if name_elem is not None and value_elem is not None and name_elem.text == 'endpoint':
+                if value_elem.text != new_endpoint:
+                    value_elem.text = new_endpoint
+                    updated = True
+
+        for endpoint_elem in self.root.findall(".//con:endpoint", self.namespaces):
+            current_value = (endpoint_elem.text or '').strip()
+            if not current_value or current_value.startswith('${'):
+                continue
+            if current_value != new_endpoint:
+                endpoint_elem.text = new_endpoint
+                updated = True
+
         return updated
     
     def save_project(self):
         """Save updated project file"""
+        resolved_path = str(Path(self.project_path).resolve())
+        if resolved_path not in self.allowed_update_paths:
+            raise ValueError(f"Refusing to write outside allowed project files: {resolved_path}")
         # Pretty print the XML
         self.tree.write(self.project_path, encoding='utf-8', xml_declaration=True)
         print(f"[+] Project saved: {self.project_path}")
@@ -552,6 +627,19 @@ class SoapRequestFixer:
         except Exception as e:
             print(f"[!] Error parsing SOAP request: {e}")
             return {'raw': soap_xml}
+
+    @staticmethod
+    def _find_field_element(request_elem: ET.Element, namespace: str, field_name: str) -> Optional[ET.Element]:
+        """Find a field element by local name or namespaced tag"""
+        namespaced_tag = f"{{{namespace}}}{field_name}"
+        for child in request_elem:
+            if child.tag == namespaced_tag:
+                return child
+            if '}' in child.tag and child.tag.split('}', 1)[1] == field_name:
+                return child
+            if child.tag == field_name:
+                return child
+        return None
     
     @staticmethod
     def generate_sample_value(element: Element) -> str:
@@ -611,22 +699,27 @@ class SoapRequestFixer:
                 # Create the request element (usually named {namespace}operationRequest)
                 request_tag = f"{{{ns['tns']}}}{operation_name}Request"
                 request_elem = ET.SubElement(body, request_tag)
-            
-            # Clear existing children
-            for child in list(request_elem):
-                request_elem.remove(child)
-            
-            # Add required fields from WSDL
+
+            # Add only missing or empty required fields from WSDL
             for child_schema in wsdl_schema.children:
-                # Use the target namespace from WSDL
-                child_tag = f"{{{ns['tns']}}}{child_schema.name}"
-                child_elem = ET.SubElement(request_elem, child_tag)
-                
-                # Add required fields or provide sample values
-                if child_schema.is_required:
-                    sample_value = SoapRequestFixer.generate_sample_value(child_schema)
-                    child_elem.text = sample_value
-                    print(f"    [+] Added required field '{child_schema.name}' = '{sample_value}'")
+                if not child_schema.is_required:
+                    continue
+
+                existing_field = SoapRequestFixer._find_field_element(
+                    request_elem,
+                    ns['tns'],
+                    child_schema.name
+                )
+                if existing_field is not None and (existing_field.text or '').strip():
+                    continue
+
+                if existing_field is None:
+                    child_tag = f"{{{ns['tns']}}}{child_schema.name}"
+                    existing_field = ET.SubElement(request_elem, child_tag)
+
+                sample_value = SoapRequestFixer.generate_sample_value(child_schema)
+                existing_field.text = sample_value
+                print(f"    [+] Added required field '{child_schema.name}' = '{sample_value}'")
             
             # Convert back to string with proper formatting
             request_str = ET.tostring(root, encoding='unicode')
@@ -648,14 +741,69 @@ class SoapSelfHealingAgent:
         self.project_root = project_root
         self.wsdl_path = wsdl_path
         self.soapui_project_path = soapui_project_path
+        self.config = self._load_config(Path(project_root) / "agent-config.json")
         
         self.wsdl_analyzer = WSDLAnalyzer(wsdl_path)
         self.test_analyzer = SoapTestAnalyzer(soapui_project_path)
         self.request_fixer = SoapRequestFixer()
         
-        self.max_iterations = 5
+        execution_config = self.config.get("execution", {})
+        self.max_iterations = execution_config.get("max_iterations", 5)
+        self.retry_delay = execution_config.get("retry_delay", 2)
+        self.auto_sync_endpoint = self.config.get("healing_scope", {}).get(
+            "allow_endpoint_updates",
+            True
+        )
+        self.mock_service_enabled = self.config.get("mock_service", {}).get(
+            "auto_start_local_mock",
+            True
+        )
+        self.mock_service = None
         self.iteration = 0
         self.history = []
+
+    def _load_config(self, config_path: Path) -> Dict:
+        """Load JSON config when available"""
+        if not config_path.exists():
+            return {}
+
+        try:
+            with config_path.open("r", encoding="utf-8") as config_file:
+                return json.load(config_file)
+        except Exception as exc:
+            print(f"[!] Failed to load config {config_path}: {exc}")
+            return {}
+
+    def _synchronize_endpoint(self) -> bool:
+        """Keep SoapUI endpoint aligned with the current WSDL endpoint"""
+        if not self.auto_sync_endpoint:
+            return False
+
+        wsdl_endpoint = self.wsdl_analyzer.get_service_endpoint()
+        if not wsdl_endpoint:
+            return False
+
+        if self.test_analyzer.update_endpoint_in_project(wsdl_endpoint):
+            print(f"[*] Synchronized SoapUI endpoint to WSDL address: {wsdl_endpoint}")
+            return True
+
+        return False
+
+    def _start_mock_service_if_needed(self):
+        """Start a local mock SOAP service for localhost endpoints"""
+        if not self.mock_service_enabled:
+            return
+
+        endpoint = self.test_analyzer._get_endpoint()
+        if not endpoint:
+            return
+
+        parsed = urlparse(endpoint)
+        if parsed.hostname not in {"localhost", "127.0.0.1"}:
+            return
+
+        self.mock_service = LocalSoapMockService(endpoint, self.wsdl_analyzer)
+        self.mock_service.start()
     
     def run(self) -> bool:
         """Main execution loop"""
@@ -666,90 +814,103 @@ class SoapSelfHealingAgent:
         print(f"WSDL: {self.wsdl_path}")
         print(f"Project: {self.soapui_project_path}")
         print("="*70 + "\n")
-        
-        while self.iteration < self.max_iterations:
-            self.iteration += 1
-            print(f"\n[ITERATION {self.iteration}/{self.max_iterations}]")
-            print("-" * 70)
-            
-            # Step 1: Run tests
-            test_result = self.test_analyzer.run_tests()
-            
-            if test_result['passed']:
-                print("[✓] ALL TESTS PASSED!")
-                self._log_success()
-                return True
-            
-            # Step 2: Analyze failures
-            print("\n[*] Analyzing test failures...")
-            failures = self.test_analyzer.extract_failures(
-                test_result['stdout'] + test_result['stderr']
-            )
-            
-            if failures:
-                for i, failure in enumerate(failures):
-                    print(f"  Failure {i+1}: {failure['message']}")
-            
-            # Step 3: Get current requests
-            requests = self.test_analyzer.get_test_requests()
-            
-            if not requests:
-                print("[!] No test requests found")
-                break
-            
-            # Step 4: Fix requests based on WSDL
-            print("\n[*] Analyzing WSDL and fixing requests...")
-            fixed_any = False
-            
-            for call_name, request_xml in requests.items():
-                print(f"\n  Processing: {call_name}")
-                
-                # Extract operation name from request or use a default
-                operation = self._extract_operation_from_request(request_xml)
-                
-                if not operation:
-                    print(f"    [!] Could not determine operation name")
-                    continue
-                
-                # Get WSDL schema for this operation
-                wsdl_schema = self.wsdl_analyzer.get_request_schema(operation)
-                
-                if not wsdl_schema:
-                    print(f"    [!] Could not find schema for operation: {operation}")
-                    continue
-                
-                # Fix the request
-                fixed_request = self.request_fixer.fix_request_from_wsdl(
-                    request_xml, 
-                    wsdl_schema,
-                    operation
+
+        try:
+            project_changed = self._synchronize_endpoint()
+            self._start_mock_service_if_needed()
+
+            while self.iteration < self.max_iterations:
+                self.iteration += 1
+                print(f"\n[ITERATION {self.iteration}/{self.max_iterations}]")
+                print("-" * 70)
+
+                # Step 1: Run tests
+                test_result = self.test_analyzer.run_tests()
+
+                if test_result['passed']:
+                    if project_changed:
+                        self.test_analyzer.save_project()
+                    print("[✓] ALL TESTS PASSED!")
+                    self._log_success()
+                    return True
+
+                # Step 2: Analyze failures
+                print("\n[*] Analyzing test failures...")
+                failures = self.test_analyzer.extract_failures(
+                    test_result['stdout'] + test_result['stderr']
                 )
-                
-                if fixed_request != request_xml:
-                    # Update in project
-                    if self.test_analyzer.update_request_in_project(call_name, fixed_request):
-                        print(f"    [+] Updated request '{call_name}'")
-                        fixed_any = True
-                    else:
-                        print(f"    [!] Failed to update request '{call_name}'")
-            
-            if not fixed_any:
-                print("\n[!] No fixes were applied. Stopping.")
-                break
-            
-            # Step 5: Save project
-            self.test_analyzer.save_project()
-            
-            # Log iteration
-            self._log_iteration(test_result, failures)
-            
-            # Wait before next iteration
-            if self.iteration < self.max_iterations:
-                print("\n[*] Waiting before next iteration...")
-                time.sleep(2)
-        
-        print(f"\n[!] Max iterations ({self.max_iterations}) reached without full success.")
-        return False
+
+                if failures:
+                    for i, failure in enumerate(failures):
+                        print(f"  Failure {i+1}: {failure['message']}")
+
+                # Step 3: Get current requests
+                requests = self.test_analyzer.get_test_requests()
+
+                if not requests:
+                    print("[!] No test requests found")
+                    break
+
+                # Step 4: Fix requests based on WSDL
+                print("\n[*] Analyzing WSDL and fixing requests...")
+                fixed_any = False
+
+                for call_name, request_xml in requests.items():
+                    print(f"\n  Processing: {call_name}")
+
+                    # Extract operation name from request or use a default
+                    operation = self._extract_operation_from_request(request_xml)
+
+                    if not operation:
+                        print(f"    [!] Could not determine operation name")
+                        continue
+
+                    # Get WSDL schema for this operation
+                    wsdl_schema = self.wsdl_analyzer.get_request_schema(operation)
+
+                    if not wsdl_schema:
+                        print(f"    [!] Could not find schema for operation: {operation}")
+                        continue
+
+                    # Fix the request
+                    fixed_request = self.request_fixer.fix_request_from_wsdl(
+                        request_xml,
+                        wsdl_schema,
+                        operation
+                    )
+
+                    if fixed_request != request_xml:
+                        if self.test_analyzer.update_request_in_project(
+                            call_name,
+                            fixed_request,
+                            request_xml
+                        ):
+                            print(f"    [+] Updated request '{call_name}'")
+                            fixed_any = True
+                            project_changed = True
+                        else:
+                            print(f"    [!] Failed to update request '{call_name}'")
+
+                if not fixed_any:
+                    print("\n[!] No fixes were applied. Stopping.")
+                    break
+
+                # Step 5: Save project
+                self.test_analyzer.save_project()
+
+                # Log iteration
+                self._log_iteration(test_result, failures)
+
+                # Wait before next iteration
+                if self.iteration < self.max_iterations:
+                    print("\n[*] Waiting before next iteration...")
+                    time.sleep(self.retry_delay)
+
+            print(f"\n[!] Max iterations ({self.max_iterations}) reached without full success.")
+            return False
+        finally:
+            if self.mock_service is not None:
+                self.mock_service.stop()
     
     def _extract_operation_from_request(self, soap_xml: str) -> Optional[str]:
         """Extract operation name from SOAP request"""
@@ -799,6 +960,142 @@ class SoapSelfHealingAgent:
             status = "✓" if entry['passed'] else "✗"
             print(f"  [{status}] Iteration {entry['iteration']}: "
                   f"{entry['failure_count']} failures")
+
+
+class LocalSoapMockService:
+    """Minimal local SOAP mock server for localhost-based CI execution"""
+
+    def __init__(self, endpoint_url: str, wsdl_analyzer: WSDLAnalyzer):
+        self.endpoint_url = endpoint_url
+        self.wsdl_analyzer = wsdl_analyzer
+        self.server = None
+        self.thread = None
+        self.parsed_endpoint = urlparse(endpoint_url)
+
+    def start(self):
+        """Start the mock server if the configured port is available"""
+        host = self.parsed_endpoint.hostname or "127.0.0.1"
+        port = self.parsed_endpoint.port or 80
+        path = self.parsed_endpoint.path or "/"
+
+        service = self
+
+        class SoapMockHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path != path:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                body_length = int(self.headers.get('Content-Length', '0'))
+                request_body = self.rfile.read(body_length).decode('utf-8')
+                status_code, response_body = service._build_response(request_body)
+                self.send_response(status_code)
+                self.send_header('Content-Type', 'text/xml; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(response_body.encode('utf-8'))
+
+            def log_message(self, format, *args):
+                return
+
+        self.server = ThreadingHTTPServer((host, port), SoapMockHandler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        print(f"[*] Local SOAP mock service listening on {host}:{port}{path}")
+
+    def stop(self):
+        """Stop the mock server"""
+        if self.server is not None:
+            self.server.shutdown()
+            self.server.server_close()
+            print("[*] Local SOAP mock service stopped")
+
+    def _build_response(self, soap_xml: str) -> Tuple[int, str]:
+        operation = self._extract_operation_name(soap_xml)
+        if not operation:
+            return 500, self._fault_response("Unable to determine SOAP operation")
+
+        schema = self.wsdl_analyzer.get_request_schema(operation)
+        if not schema:
+            return 500, self._fault_response(f"No WSDL schema found for operation {operation}")
+
+        request_values = self._extract_request_values(soap_xml)
+        missing_fields = [
+            child.name
+            for child in schema.children
+            if child.is_required and not (request_values.get(child.name) or "").strip()
+        ]
+
+        if missing_fields:
+            return 500, self._fault_response(
+                "Missing required field(s): " + ", ".join(sorted(missing_fields))
+            )
+
+        return 200, self._success_response(operation, request_values)
+
+    def _extract_operation_name(self, soap_xml: str) -> Optional[str]:
+        try:
+            root = ET.fromstring(soap_xml)
+            body = root.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Body')
+            if body is None:
+                return None
+
+            for child in body:
+                tag = child.tag.split('}', 1)[-1]
+                return tag[:-7] if tag.endswith('Request') else tag
+        except ET.ParseError:
+            return None
+        return None
+
+    def _extract_request_values(self, soap_xml: str) -> Dict[str, str]:
+        values = {}
+        try:
+            root = ET.fromstring(soap_xml)
+            body = root.find('.//{http://schemas.xmlsoap.org/soap/envelope/}Body')
+            if body is None:
+                return values
+
+            request_elem = next(iter(body), None)
+            if request_elem is None:
+                return values
+
+            for child in request_elem:
+                field_name = child.tag.split('}', 1)[-1]
+                values[field_name] = (child.text or '').strip()
+        except ET.ParseError:
+            return values
+
+        return values
+
+    def _success_response(self, operation: str, request_values: Dict[str, str]) -> str:
+        namespace = self.wsdl_analyzer._extract_target_namespace()
+        case_id = request_values.get("caseId", "123")
+        status = request_values.get("status", "SUCCESS") or "SUCCESS"
+
+        echoed_fields = []
+        for field_name, field_value in request_values.items():
+            if field_name == "status":
+                continue
+            echoed_fields.append(f"<{field_name}>{field_value}</{field_name}>")
+
+        echoed_fields.insert(0, f"<caseFileId>CF-{case_id}</caseFileId>")
+        echoed_fields.insert(1, f"<status>{status}</status>")
+
+        payload = "".join(echoed_fields)
+        return (
+            f'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" '
+            f'xmlns:tns="{namespace}"><soapenv:Header/><soapenv:Body>'
+            f'<tns:{operation}Response>{payload}</tns:{operation}Response>'
+            f'</soapenv:Body></soapenv:Envelope>'
+        )
+
+    def _fault_response(self, message: str) -> str:
+        return (
+            '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
+            '<soapenv:Body><soapenv:Fault><faultcode>soapenv:Client</faultcode>'
+            f'<faultstring>{message}</faultstring>'
+            '</soapenv:Fault></soapenv:Body></soapenv:Envelope>'
+        )
 
 
 def main():

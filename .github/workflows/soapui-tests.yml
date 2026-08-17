@@ -1,0 +1,93 @@
+name: SoapUI Regression Tests
+
+on:
+  push:
+    paths:
+      - "**/*.wsdl"
+      - "**/*-final.xml"
+      - "soap-self-healing-agent.py"
+      - "run-agent.sh"
+      - "agent-config.json"
+      - "pom.xml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/soapui-tests.yml"
+  pull_request:
+    paths:
+      - "**/*.wsdl"
+      - "**/*-final.xml"
+      - "soap-self-healing-agent.py"
+      - "run-agent.sh"
+      - "agent-config.json"
+      - "pom.xml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".github/workflows/soapui-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  soap-self-healing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Python dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Make launcher executable
+        run: chmod +x /home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent/run-agent.sh
+
+      - name: Run SOAP self-healing agent
+        run: /home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent/run-agent.sh
+
+      - name: Upload agent execution log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-execution-log
+          path: /home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent/agent-execution.log
+          if-no-files-found: warn
+
+      - name: Upload healed SoapUI project
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: healed-soapui-project
+          path: /home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent-final.xml
+          if-no-files-found: error
+
+      - name: Commit healed SoapUI assets
+        if: github.event_name == 'push'
+        run: |
+          cd /home/runner/work/Intelligent-Regression-Testing-Agent/Intelligent-Regression-Testing-Agent
+          if git diff --quiet -- Intelligent-Regression-Testing-Agent-final.xml agent-execution.log; then
+            echo "No healed assets to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Intelligent-Regression-Testing-Agent-final.xml agent-execution.log
+          git commit -m "chore: persist healed SOAP assets [skip ci]"
+          git push
